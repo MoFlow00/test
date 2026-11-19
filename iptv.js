@@ -222,7 +222,7 @@ async function uploadToGithub(fileName, content, retries = 3) {
             originalConsoleLog(text);
         });
 
-        const url = 'https://freeiptv2023-d.ottc.xyz/?action=view';
+        const url = 'https://freeiptv2023-d.ottc.xyz/';
         console.log(`2. Opening URL: ${url}`);
 
         try {
@@ -231,62 +231,82 @@ async function uploadToGithub(fileName, content, retries = 3) {
             console.log(`⚠️ Navigation warning: ${e.message}`);
         }
 
-        console.log("⏳ Waiting 20 seconds for Cloudflare Turnstile auto-solve...");
-        await new Promise(r => setTimeout(r, 20000));
-
-        // محاولة نقر احتياطية على iframe الخاص بـ Cloudflare
-        const frames = page.frames();
-        const cfFrame = frames.find(f => f.url().includes('challenges.cloudflare.com'));
-        if (cfFrame) {
-            console.log("🔍 Cloudflare Turnstile iframe detected, simulating human interaction...");
-            try {
-                const iframeElement = await page.$('iframe[src*="challenges.cloudflare.com"]');
-                if (iframeElement) {
-                    const box = await iframeElement.boundingBox();
-                    if (box) {
-                        await page.mouse.move(box.x + 30, box.y + box.height / 2, { steps: 15 });
-                        await new Promise(r => setTimeout(r, 500));
-                        await page.mouse.click(box.x + 30, box.y + box.height / 2);
-                        await new Promise(r => setTimeout(r, 8000));
-                    }
-                }
-            } catch (e) {
-                console.log("⚠️ Manual Turnstile click attempt skipped:", e.message);
-            }
-        }
-
-        console.log("3. Waiting for the Create Free IPTV Account button to become enabled (max 90s)...");
+        console.log("3. Waiting for Cloudflare Turnstile completion & button activation (max 120s)...");
         const buttonWaitStarted = Date.now();
-        const buttonWaitLimit = 90000;
+        const buttonWaitLimit = 120000;
         let buttonState = null;
+        let lastClickAttempt = 0;
 
         while (Date.now() - buttonWaitStarted < buttonWaitLimit) {
+            const elapsed = Math.floor((Date.now() - buttonWaitStarted) / 1000);
+
+            // فحص حالة الزر والـ Turnstile
             buttonState = await page.evaluate(() => {
-                const elements = Array.from(document.querySelectorAll('button, a, input[type="submit"], input[type="button"]'));
-                const target = elements.find(el => {
-                    const label = (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().toLowerCase();
-                    return label.includes('create free iptv account');
-                });
-                if (!target) return { found: false };
-                const style = window.getComputedStyle(target);
-                const visible = target.offsetWidth > 0 && target.offsetHeight > 0 && style.display !== "none" && style.visibility !== "hidden";
-                const disabled = Boolean(target.disabled || target.getAttribute('aria-disabled') === 'true' || target.classList.contains('disabled') || target.classList.contains('is-disabled') || style.pointerEvents === 'none');
-                return { found: true, visible, disabled, pageText: document.body.innerText.slice(0, 700) };
+                const btn = document.querySelector('#create-btn') || Array.from(document.querySelectorAll('button, input[type="submit"]')).find(el => (el.value || el.innerText || '').toLowerCase().includes('create free iptv account'));
+                const tokenInput = document.querySelector('[name="cf-turnstile-response"]');
+                const token = tokenInput ? tokenInput.value : '';
+
+                if (!btn) return { found: false, tokenLength: token.length };
+
+                const style = window.getComputedStyle(btn);
+                const visible = btn.offsetWidth > 0 && btn.offsetHeight > 0 && style.display !== "none" && style.visibility !== "hidden";
+                const disabled = Boolean(btn.disabled || btn.getAttribute('aria-disabled') === 'true' || btn.classList.contains('disabled'));
+
+                return {
+                    found: true,
+                    visible,
+                    disabled,
+                    tokenLength: token.length,
+                    pageText: document.body ? document.body.innerText.slice(0, 500) : ''
+                };
             });
 
-            const elapsed = Math.floor((Date.now() - buttonWaitStarted) / 1000);
+            // لو الـ Token ظهر أو الزر اتفعل
             if (buttonState.found && buttonState.visible && !buttonState.disabled) {
-                console.log("   [" + elapsed + "s] Button is visible and enabled.");
+                console.log(`   [${elapsed}s] ✅ Button is enabled! (Token length: ${buttonState.tokenLength})`);
                 break;
             }
-            if (elapsed % 5 === 0) console.log("   [" + elapsed + "s] Waiting for button activation...", buttonState);
+
+            // لو الـ Turnstile لسه ماتحلش ومر وقت كافي، نحاول نضغط على الـ checkbox داخل الـ iframe
+            if (Date.now() - lastClickAttempt > 8000) {
+                lastClickAttempt = Date.now();
+                try {
+                    const frames = page.frames();
+                    const cfFrame = frames.find(f => f.url().includes('challenges.cloudflare.com'));
+                    if (cfFrame) {
+                        const iframeElement = await page.$('iframe[src*="challenges.cloudflare.com"]');
+                        if (iframeElement) {
+                            const box = await iframeElement.boundingBox();
+                            if (box && box.width > 0 && box.height > 0) {
+                                // مكان مربع الاختيار المعتاد داخل Turnstile widget
+                                const clickX = box.x + Math.min(30, box.width / 4);
+                                const clickY = box.y + box.height / 2;
+                                await page.mouse.move(clickX, clickY, { steps: 10 });
+                                await new Promise(r => setTimeout(r, 200));
+                                await page.mouse.click(clickX, clickY);
+                                console.log(`   [${elapsed}s] Clicked Turnstile widget checkbox area.`);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // تجاهل أخطاء النقر السريعة
+                }
+            }
+
+            if (elapsed % 5 === 0) {
+                console.log(`   [${elapsed}s] Waiting for Turnstile / button...`, {
+                    disabled: buttonState ? buttonState.disabled : null,
+                    tokenLength: buttonState ? buttonState.tokenLength : 0
+                });
+            }
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
-        if (!buttonState || !buttonState.found || !buttonState.visible || buttonState.disabled) {
-            const pageText = await page.evaluate(() => document.body.innerText.substring(0, 700));
+        if (!buttonState || !buttonState.found || buttonState.disabled) {
+            await takeAndSendScreenshot('turnstile_failed');
+            const pageText = await page.evaluate(() => document.body ? document.body.innerText.substring(0, 700) : '');
             console.log("Create account button did not become enabled. Current page text:", pageText);
-            throw new Error("Create Free IPTV Account button was not enabled within 90 seconds.");
+            throw new Error("Create Free IPTV Account button was not enabled within 120 seconds.");
         }
 
         console.log("4. Clicking the enabled create-account button...");
