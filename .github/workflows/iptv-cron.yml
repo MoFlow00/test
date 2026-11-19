@@ -3,7 +3,10 @@ name: IPTV Script
 on:
   schedule:
     - cron: '0 */6 * * *'   # كل 6 ساعات (UTC)
-  workflow_dispatch:          # السماح بالتشغيل اليدوي
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   run-iptv:
@@ -17,12 +20,20 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Setup Chrome
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+
       - name: Install dependencies
         run: npm install puppeteer-core
 
       - name: Run IPTV script
         run: node iptv.js
         env:
-          # إذا كانت الإعدادات تُقرأ من ملف iptv_settings.js يمكنك تجاهلها
-          # أو تمرير القيم الحساسة عبر Secrets
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO: ${{ github.repository }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PUPPETEER_EXECUTABLE_PATH: ${{ steps.setup-chrome.outputs.chrome-path }}
