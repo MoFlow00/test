@@ -27,10 +27,13 @@ jobs:
           chrome-version: stable
 
       - name: Install dependencies
-        run: npm install puppeteer-core
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          npm install puppeteer-real-browser
 
       - name: Run IPTV script
-        run: node iptv.js
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" node iptv.js
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPO: ${{ github.repository }}
