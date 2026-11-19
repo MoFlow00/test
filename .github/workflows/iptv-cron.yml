@@ -1,0 +1,28 @@
+name: IPTV Script
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # كل 6 ساعات (UTC)
+  workflow_dispatch:          # السماح بالتشغيل اليدوي
+
+jobs:
+  run-iptv:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install puppeteer-core
+
+      - name: Run IPTV script
+        run: node iptv.js
+        env:
+          # إذا كانت الإعدادات تُقرأ من ملف iptv_settings.js يمكنك تجاهلها
+          # أو تمرير القيم الحساسة عبر Secrets
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
