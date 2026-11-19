@@ -203,6 +203,8 @@ console.log(`❌ Failed to upload ${fileName} to GitHub after ${retries} attempt
         browser = await puppeteer.launch({
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome',
             args: [
+                '--no-sandbox',
+                
             ]
         });
 
