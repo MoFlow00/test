@@ -290,55 +290,100 @@ async function uploadToGithub(fileName, content, retries = 3) {
         }
 
         console.log("4. Clicking the enabled create-account button...");
-        const clicked = await page.evaluate(() => {
-            const elements = Array.from(document.querySelectorAll('button, a, input[type="submit"], input[type="button"]'));
-            const target = elements.find(el => {
-                const label = (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().toLowerCase();
-                if (!label.includes('create free iptv account')) return false;
-                const style = window.getComputedStyle(el);
-                const visible = el.offsetWidth > 0 && el.offsetHeight > 0 && style.display !== "none" && style.visibility !== "hidden";
-                const disabled = Boolean(el.disabled || el.getAttribute('aria-disabled') === 'true' || el.classList.contains('disabled') || el.classList.contains('is-disabled') || style.pointerEvents === 'none');
-                return visible && !disabled;
+        // استخدام click حقيقي بالماوس من Puppeteer مع scroll لضمان تفاعل بشري معتمد
+        let clicked = false;
+        try {
+            const elements = await page.$$('button, a, input[type="submit"], input[type="button"]');
+            for (const el of elements) {
+                const isTarget = await page.evaluate(node => {
+                    const label = (node.innerText || node.value || node.getAttribute('aria-label') || '').trim().toLowerCase();
+                    if (!label.includes('create free iptv account')) return false;
+                    const style = window.getComputedStyle(node);
+                    const visible = node.offsetWidth > 0 && node.offsetHeight > 0 && style.display !== "none" && style.visibility !== "hidden";
+                    const disabled = Boolean(node.disabled || node.getAttribute('aria-disabled') === 'true' || node.classList.contains('disabled') || node.classList.contains('is-disabled') || style.pointerEvents === 'none');
+                    return visible && !disabled;
+                }, el);
+
+                if (isTarget) {
+                    await el.scrollIntoViewIfNeeded().catch(() => {});
+                    await new Promise(r => setTimeout(r, 500));
+                    const box = await el.boundingBox();
+                    if (box) {
+                        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 5 });
+                        await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+                    } else {
+                        await el.click();
+                    }
+                    clicked = true;
+                    console.log("   Click dispatched using mouse interaction.");
+                    break;
+                }
+            }
+        } catch (e) {
+            console.log("⚠️ Puppeteer mouse click failed, falling back to JS click:", e.message);
+        }
+
+        if (!clicked) {
+            clicked = await page.evaluate(() => {
+                const elements = Array.from(document.querySelectorAll('button, a, input[type="submit"], input[type="button"]'));
+                const target = elements.find(el => {
+                    const label = (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().toLowerCase();
+                    if (!label.includes('create free iptv account')) return false;
+                    const style = window.getComputedStyle(el);
+                    const visible = el.offsetWidth > 0 && el.offsetHeight > 0 && style.display !== "none" && style.visibility !== "hidden";
+                    const disabled = Boolean(el.disabled || el.getAttribute('aria-disabled') === 'true' || el.classList.contains('disabled') || el.classList.contains('is-disabled') || style.pointerEvents === 'none');
+                    return visible && !disabled;
+                });
+                if (!target) return false;
+                target.click();
+                return true;
             });
-            if (!target) return false;
-            target.click();
-            return true;
-        });
+        }
 
         if (!clicked) throw new Error("The create-account button became unavailable before the click.");
 
-        console.log("5. Waiting for generated account details (max 60s)...");
+        console.log("5. Waiting for generated account details or page update (max 60s)...");
         const pageTextBeforeClick = buttonState.pageText || "";
+
         try {
-            await page.waitForFunction(
-                previousText => {
-                    const currentText = document.body.innerText || "";
-                    const lower = currentText.toLowerCase();
-                    const hasAccountLabels = lower.includes("username") && lower.includes("password") && currentText.length > previousText.length;
-                    const hasPlaylistLink = Array.from(document.querySelectorAll("a")).some(a => /\.m3u|get\.php/i.test(a.href));
-                    return hasAccountLabels || hasPlaylistLink;
-                },
-                { timeout: 60000 },
-                pageTextBeforeClick
-            );
-            console.log("Account details or playlist link detected.");
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await Promise.race([
+                page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(() => null),
+                page.waitForFunction(
+                    previousText => {
+                        const currentText = document.body ? (document.body.innerText || "") : "";
+                        const lower = currentText.toLowerCase();
+                        const hasAccountLabels = (lower.includes("username") || lower.includes("user")) && (lower.includes("password") || lower.includes("pass"));
+                        const hasPlaylistLink = Array.from(document.querySelectorAll("a")).some(a => /\.m3u|get\.php/i.test(a.href));
+                        const hasM3uInput = Array.from(document.querySelectorAll("input, textarea")).some(i => (i.value || "").includes("get.php") || (i.value || "").includes(".m3u"));
+                        const changed = currentText.length !== previousText.length;
+                        return (hasAccountLabels && changed) || hasPlaylistLink || hasM3uInput;
+                    },
+                    { timeout: 60000 },
+                    pageTextBeforeClick
+                )
+            ]);
+            console.log("Account details, URL update, or response detected.");
+            await new Promise(resolve => setTimeout(resolve, 3000));
         } catch (e) {
-            console.log("No account details detected after clicking. Saving the current page for diagnosis.");
+            console.log("No explicit change detected within wait limit. Proceeding with deep page analysis...");
         }
+
+        await takeAndSendScreenshot('after_click');
 
         const accountData = await page.evaluate(() => {
             const data = {};
 
-            const inputs = document.querySelectorAll('input');
+            // 1. فحص جميع الـ inputs و textareas
+            const inputs = document.querySelectorAll('input, textarea');
             inputs.forEach(input => {
-                const val = input.value || '';
-                const name = (input.name || input.id || input.placeholder || '').toLowerCase();
-                if (val && !['submit', 'button', 'hidden'].includes(input.type)) {
+                const val = (input.value || '').trim();
+                const name = (input.name || input.id || input.placeholder || input.className || '').toLowerCase();
+                if (val && !['submit', 'button', 'hidden', 'reset'].includes(input.type)) {
                     data[name || 'field_' + Math.random().toString(36).substring(7)] = val;
                 }
             });
 
+            // 2. فحص الجداول <tr>
             const rows = document.querySelectorAll('tr');
             rows.forEach(tr => {
                 const cells = tr.querySelectorAll('td, th');
@@ -349,13 +394,25 @@ async function uploadToGithub(fileName, content, retries = 3) {
                 }
             });
 
+            // 3. فحص الكروت، التنبيهات، وعناصر pre/code/div
+            const alertCards = document.querySelectorAll('.alert, .card, .result, .panel, pre, code, [class*="alert"], [class*="result"], [class*="success"]');
+            let alertText = '';
+            alertCards.forEach(c => {
+                const t = (c.innerText || '').trim();
+                if (t.length > 5 && t.length < 1500) {
+                    alertText += '\n' + t;
+                }
+            });
+
+            // 4. استخراج روابط الـ M3U أو روابط التحميل
             const links = Array.from(document.querySelectorAll('a')).map(a => a.href);
-            const m3uLink = links.find(l => l.includes('.m3u') || l.includes('get.php'));
+            const m3uLink = links.find(l => /\.m3u|get\.php/i.test(l)) || '';
 
             return {
                 structured: data,
-                m3uLink: m3uLink || '',
-                fullText: document.body.innerText
+                alertText: alertText,
+                m3uLink: m3uLink,
+                fullText: document.body ? document.body.innerText : ''
             };
         });
 
@@ -370,19 +427,38 @@ async function uploadToGithub(fileName, content, retries = 3) {
             foundDetails = true;
 
             const lowerKey = key.toLowerCase();
-            if (lowerKey.includes('user')) extractedUser = value;
-            if (lowerKey.includes('pass')) extractedPass = value;
+            if (lowerKey.includes('user') && !extractedUser) extractedUser = value;
+            if (lowerKey.includes('pass') && !extractedPass) extractedPass = value;
+        }
+
+        // البحث من خلال رابط M3U لو موجود وفيه username & password
+        const linkToScan = accountData.m3uLink || Object.values(accountData.structured).find(v => typeof v === 'string' && (v.includes('.m3u') || v.includes('get.php')));
+        if (linkToScan) {
+            try {
+                const parsedUrl = new URL(linkToScan, url);
+                const u = parsedUrl.searchParams.get('username') || parsedUrl.searchParams.get('user');
+                const p = parsedUrl.searchParams.get('password') || parsedUrl.searchParams.get('pass');
+                if (u && !extractedUser) extractedUser = u;
+                if (p && !extractedPass) extractedPass = p;
+                if (!accountData.m3uLink) accountData.m3uLink = linkToScan;
+            } catch (err) {
+                const matchU = linkToScan.match(/[?&](?:user(?:name)?)=([^&]+)/i);
+                const matchP = linkToScan.match(/[?&](?:pass(?:word)?)=([^&]+)/i);
+                if (matchU && !extractedUser) extractedUser = matchU[1];
+                if (matchP && !extractedPass) extractedPass = matchP[1];
+            }
         }
 
         if (!extractedUser || !extractedPass) {
-            console.log("🔍 Trying fallback extraction via Regex...");
-            const fullText = accountData.fullText;
+            console.log("🔍 Trying fallback extraction via Regex on full text & alert blocks...");
+            const combinedText = (accountData.alertText + "\n" + accountData.fullText);
 
-            const userMatch = fullText.match(/(?:user(?:name)?)\s*[:=]\s*([^\s]+)/i);
-            const passMatch = fullText.match(/(?:pass(?:word)?)\s*[:=]\s*([^\s]+)/i);
+            // Regex مرن يلتقط: Username : value أو User: value أو اسم المستخدم: value
+            const userMatches = combinedText.match(/(?:username|user|اسم\s*المستخدم)\s*[:=]\s*([^\r\n\t ]+)/i);
+            const passMatches = combinedText.match(/(?:password|pass|كلمة\s*المرور)\s*[:=]\s*([^\r\n\t ]+)/i);
 
-            if (userMatch && !extractedUser) extractedUser = userMatch[1];
-            if (passMatch && !extractedPass) extractedPass = passMatch[1];
+            if (userMatches && !extractedUser) extractedUser = userMatches[1].trim();
+            if (passMatches && !extractedPass) extractedPass = passMatches[1].trim();
 
             if (extractedUser) console.log(`Regex Fallback - User: ${extractedUser}`);
             if (extractedPass) console.log(`Regex Fallback - Pass: ${extractedPass}`);
