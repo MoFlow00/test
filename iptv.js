@@ -407,10 +407,12 @@ console.log(`❌ Failed to upload ${fileName} to GitHub after ${retries} attempt
                 console.log("❌ base.m3u file not found in the current directory.");
             }
         } else {
+            process.exitCode = 1;
             console.log("⚠️ Username or Password not found in the extracted data.");
         }
 
     } catch (err) {
+        process.exitCode = 1;
         console.log(`❌ Error occurred: ${err.message}`);
         const logFilePath = saveLogsToFile();
         originalConsoleLog(`📄 Error log saved to: ${logFilePath}`);
