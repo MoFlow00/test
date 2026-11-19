@@ -235,72 +235,75 @@ console.log(`❌ Failed to upload ${fileName} to GitHub after ${retries} attempt
         console.log("⏳ Waiting 15 seconds to bypass Cloudflare verification...");
         await new Promise(r => setTimeout(r, 15000));
 
-        console.log("3. Waiting for 'Create Free IPTV Account' button (max 60s)...");
-        const startTime = Date.now();
-        const maxWait = 60000;
-        let buttonFound = false;
+        console.log("3. Waiting for the Create Free IPTV Account button to become enabled (max 90s)...");
+        const buttonWaitStarted = Date.now();
+        const buttonWaitLimit = 90000;
+        let buttonState = null;
 
-        while (Date.now() - startTime < maxWait) {
-            await new Promise(r => setTimeout(r, 1000));
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
-
-            try {
-                const exists = await page.evaluate(() => {
-                    const elements = Array.from(document.querySelectorAll('button, a, input[type="submit"], input[type="button"]'));
-                    return elements.some(el => {
-                        const textMatch = (el.innerText || el.value || '').toLowerCase().includes('create free iptv account');
-                        const isVisible = el.offsetWidth > 0 && el.offsetHeight > 0;
-                        const notDisabled = !el.disabled;
-                        return textMatch && isVisible && notDisabled;
-                    });
+        // Wait for the page countdown to enable the button. Never click while disabled.
+        while (Date.now() - buttonWaitStarted < buttonWaitLimit) {
+            buttonState = await page.evaluate(() => {
+                const elements = Array.from(document.querySelectorAll('button, a, input[type="submit"], input[type="button"]'));
+                const target = elements.find(el => {
+                    const label = (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().toLowerCase();
+                    return label.includes('create free iptv account');
                 });
-                
-                if (exists) {
-                    buttonFound = true;
-                    console.log(`   [${elapsed}s] ✅ Button found and ready!`);
-                    await new Promise(r => setTimeout(r, 1000));
-                    break;
-                }
-            } catch (e) {}
-
-            if (browserConsoleBuffer.length > 0) {
-                const recentLogs = browserConsoleBuffer.slice(-3);
-                console.log(`   [${elapsed}s] Browser:`, recentLogs.join(' | '));
-            } else {
-                console.log(`   [${elapsed}s] Waiting for button...`);
+                if (!target) return { found: false };
+                const style = window.getComputedStyle(target);
+                const visible = target.offsetWidth > 0 && target.offsetHeight > 0 && style.display !== "none" && style.visibility !== "hidden";
+                const disabled = Boolean(target.disabled || target.getAttribute('aria-disabled') === 'true' || target.classList.contains('disabled') || target.classList.contains('is-disabled') || style.pointerEvents === 'none');
+                return { found: true, visible, disabled, pageText: document.body.innerText.slice(0, 700) };
+            });
+            const elapsed = Math.floor((Date.now() - buttonWaitStarted) / 1000);
+            if (buttonState.found && buttonState.visible && !buttonState.disabled) {
+                console.log("   [" + elapsed + "s] Button is visible and enabled.");
+                break;
             }
+            if (elapsed % 5 === 0) console.log("   [" + elapsed + "s] Waiting for button activation...", buttonState);
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
-        if (!buttonFound) {
-            console.log(`   [${Math.floor((Date.now() - startTime) / 1000)}s] ⚠️ Button NOT found after max wait. Current page content:`);
-            const pageText = await page.evaluate(() => document.body.innerText.substring(0, 500));
-            console.log(pageText);
+        if (!buttonState || !buttonState.found || !buttonState.visible || buttonState.disabled) {
+            const pageText = await page.evaluate(() => document.body.innerText.substring(0, 700));
+            console.log("Create account button did not become enabled. Current page text:", pageText);
+            throw new Error("Create Free IPTV Account button was not enabled within 90 seconds.");
         }
 
-        console.log("4. Clicking create account...");
-        await page.evaluate(() => {
+        console.log("4. Clicking the enabled create-account button...");
+        const clicked = await page.evaluate(() => {
             const elements = Array.from(document.querySelectorAll('button, a, input[type="submit"], input[type="button"]'));
             const target = elements.find(el => {
-                const textMatch = (el.innerText || el.value || '').toLowerCase().includes('create free iptv account');
-                const isVisible = el.offsetWidth > 0 && el.offsetHeight > 0;
-                return textMatch && isVisible && !el.disabled;
+                const label = (el.innerText || el.value || el.getAttribute('aria-label') || '').trim().toLowerCase();
+                if (!label.includes('create free iptv account')) return false;
+                const style = window.getComputedStyle(el);
+                const visible = el.offsetWidth > 0 && el.offsetHeight > 0 && style.display !== "none" && style.visibility !== "hidden";
+                const disabled = Boolean(el.disabled || el.getAttribute('aria-disabled') === 'true' || el.classList.contains('disabled') || el.classList.contains('is-disabled') || style.pointerEvents === 'none');
+                return visible && !disabled;
             });
-            if (target) target.click();
+            if (!target) return false;
+            target.click();
+            return true;
         });
+        if (!clicked) throw new Error("The create-account button became unavailable before the click.");
 
-        console.log("5. Waiting for account generation details...");
+        console.log("5. Waiting for generated account details (max 60s)...");
+        const pageTextBeforeClick = buttonState.pageText || "";
         try {
             await page.waitForFunction(
-                () => {
-                    const text = document.body.innerText.toLowerCase();
-                    return text.includes('user') || text.includes('pass') || text.includes('m3u');
+                previousText => {
+                    const currentText = document.body.innerText || "";
+                    const lower = currentText.toLowerCase();
+                    const hasAccountLabels = lower.includes("username") && lower.includes("password") && currentText.length > previousText.length;
+                    const hasPlaylistLink = Array.from(document.querySelectorAll("a")).some(a => /\.m3u|get\.php/i.test(a.href));
+                    return hasAccountLabels || hasPlaylistLink;
                 },
-                { timeout: 45000 }
+                { timeout: 60000 },
+                pageTextBeforeClick
             );
-            console.log("✅ Data appeared on page, extracting...");
-            await new Promise(r => setTimeout(r, 2000)); 
+            console.log("Account details or playlist link detected.");
+            await new Promise(resolve => setTimeout(resolve, 2000));
         } catch (e) {
-            console.log("⚠️ Timeout waiting for data. It might be a Captcha or an ad page.");
+            console.log("No account details detected after clicking. Saving the current page for diagnosis.");
         }
 
         const accountData = await page.evaluate(() => {
