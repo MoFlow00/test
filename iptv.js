@@ -1,7 +1,17 @@
 const puppeteer = require('puppeteer-core');
 const fs = require('fs');
 const path = require('path');
-const settings = require('./iptv_settings');
+// Runtime configuration is supplied through GitHub Actions environment variables.
+const settings = {
+    TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN || '',
+    TELEGRAM_CHAT_ID: process.env.TELEGRAM_CHAT_ID || '',
+    GITHUB_REPO: process.env.GITHUB_REPO || 'MoFlow00/test',
+    GITHUB_TOKEN: process.env.GITHUB_TOKEN || ''
+};
+
+if (!settings.GITHUB_TOKEN) {
+    throw new Error('Missing required environment variable: GITHUB_TOKEN');
+}
 
 // ==================== LOG CAPTURE SYSTEM ====================
 const logBuffer = [];
@@ -191,7 +201,7 @@ console.log(`❌ Failed to upload ${fileName} to GitHub after ${retries} attempt
     try {
         console.log("1. Opening browser...");
         browser = await puppeteer.launch({
-            executablePath: '/usr/bin/google-chrome',
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome',
             args: [
                 '--no-sandbox',
                 '--disable-gpu',
