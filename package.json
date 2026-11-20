@@ -1,0 +1,24 @@
+{
+  "name": "iptv-auto-generator",
+  "version": "1.0.0",
+  "description": "Auto IPTV account generator with AI extraction via GitHub Models",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "puppeteer-real-browser": "^0.0.29"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "iptv",
+    "automation",
+    "puppeteer",
+    "github-models",
+    "ai"
+  ],
+  "license": "MIT"
+}
