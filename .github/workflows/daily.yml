@@ -4,7 +4,7 @@ on:
   schedule:
     # كل يوم الساعة 8 صباحاً بتوقيت القاهرة (6 UTC)
     - cron: '0 6 * * *'
-  workflow_dispatch: # زر تشغيل يدوي
+  workflow_dispatch:
 
 jobs:
   run-iptv:
@@ -14,8 +14,6 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GH_TOKEN }}
     
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -29,7 +27,7 @@ jobs:
         chrome-version: stable
       id: chrome
     
-    - name: Install Xvfb (Virtual Display)
+    - name: Install Xvfb and fonts
       run: |
         sudo apt-get update
         sudo apt-get install -y xvfb fonts-liberation fonts-noto-color-emoji libgbm1
@@ -58,23 +56,30 @@ jobs:
         DISPLAY: ':99.0'
         TZ: 'Africa/Cairo'
       run: |
-        # تشغيل شاشة افتراضية في الخلفية
         Xvfb :99 -screen 0 1280x800x24 > /dev/null 2>&1 &
         sleep 5
-        
-        # تشغيل السكربت
         node index.js
     
     - name: Commit and push results
       if: always()
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
-        git config --local user.email "github-actions[bot]@users.noreply.github.com"
-        git config --local user.name "github-actions[bot]"
+        # إعداد git
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git config user.name "github-actions[bot]"
+        
+        # سحب آخر التعديلات
         git pull --rebase origin ${{ github.ref_name }} || true
+        
+        # إضافة الملفات
         git add -A
+        
+        # Commit و push لو في تغييرات
         if ! git diff --staged --quiet; then
           git commit -m "🤖 Auto update - $(TZ='Africa/Cairo' date +'%Y-%m-%d %H:%M:%S')"
-          git push
+          git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git
+          echo "✅ Changes pushed successfully"
+        else
+          echo "ℹ️ No changes to commit"
         fi
-      env:
-        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
