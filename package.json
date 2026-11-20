@@ -7,9 +7,6 @@
     "start": "node index.js",
     "dev": "node index.js"
   },
-  "dependencies": {
-    "puppeteer-real-browser": "^0.0.29"
-  },
   "engines": {
     "node": ">=18.0.0"
   },
@@ -21,5 +18,8 @@
     "ai"
   ],
   "license": "MIT",
-  "author": ""
+  "author": "",
+  "dependencies": {
+    "puppeteer-real-browser": "^1.4.4"
+  }
 }

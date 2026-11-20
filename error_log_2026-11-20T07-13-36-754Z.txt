@@ -1,0 +1,105 @@
+[2026-11-20T07:11:32.494Z] [INFO] 🚀 [Start] Script started...
+[2026-11-20T07:11:32.893Z] [INFO] 1. Opening Real Browser...
+[2026-11-20T07:11:33.955Z] [INFO] 2. Opening URL: https://freeiptv2023-d.ottc.xyz/
+[2026-11-20T07:11:35.895Z] [INFO] 3. Waiting for Cloudflare Turnstile completion & button activation (max 120s)...
+[2026-11-20T07:11:35.899Z] [INFO]    [0s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:11:41.778Z] [INFO]    [5s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:11:47.620Z] [INFO]    [10s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:11:52.310Z] [INFO]    [15s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:11:57.388Z] [INFO]    [20s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:12:02.162Z] [INFO]    [25s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:12:07.038Z] [INFO]    [30s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:12:11.872Z] [INFO] 🔄 Reloading page after 5 failed Turnstile attempts...
+[2026-11-20T07:12:15.095Z] [INFO]    [35s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:12:16.873Z] [INFO]    [40s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:12:22.593Z] [INFO]    [45s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:12:27.587Z] [INFO]    [50s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:12:32.475Z] [INFO]    [55s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:12:37.235Z] [INFO]    [60s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:12:42.383Z] [INFO]    [65s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:12:47.131Z] [INFO]    [70s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:12:52.224Z] [INFO]    [75s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:12:54.229Z] [INFO] 🔄 Reloading page after 5 failed Turnstile attempts...
+[2026-11-20T07:13:02.541Z] [INFO]    [85s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:13:07.234Z] [INFO]    [90s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:13:12.291Z] [INFO]    [95s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:13:17.345Z] [INFO]    [100s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:13:22.350Z] [INFO]    [105s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:13:27.194Z] [INFO]    [110s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:13:32.262Z] [INFO]    [115s] ⏳ Waiting for Turnstile... {
+  "disabled": true,
+  "tokenLength": 0
+}
+[2026-11-20T07:13:36.753Z] [INFO] Create account button did not become enabled. Current page text: freeiptv
+Free IPTV with 30,000+ channels
+Please wait 5 seconds for the button to get unlocked...
+[2026-11-20T07:13:36.753Z] [INFO] ❌ Error occurred: Cloudflare Turnstile was not solved within 120 seconds.
+
+=================== BROWSER CONSOLE LOGS ===================
+[Browser Console] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found)
