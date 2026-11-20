@@ -6,80 +6,78 @@ on:
     - cron: '0 6 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   run-iptv:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-    
-    - name: Setup Chrome Browser
-      uses: browser-actions/setup-chrome@v1
-      with:
-        chrome-version: stable
-      id: chrome
-    
-    - name: Install Xvfb and fonts
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y xvfb fonts-liberation fonts-noto-color-emoji libgbm1
-    
-    - name: Install npm dependencies
-      run: |
-        npm init -y 2>/dev/null || true
-        npm install puppeteer-real-browser
-    
-    - name: Create base.m3u if not exists
-      run: |
-        if [ ! -f base.m3u ]; then
-          echo "#EXTM3U" > base.m3u
-          echo "#EXTINF:-1,IPTV Channel" >> base.m3u
-          echo "http://example.com/get.php?username={USERNAME}&password={PASSWORD}&type=m3u_plus" >> base.m3u
-        fi
-    
-    - name: Run IPTV script
-      env:
-        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        GITHUB_REPO: ${{ github.repository }}
-        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
-        PUPPETEER_EXECUTABLE_PATH: ${{ steps.chrome.outputs.chrome-path }}
-        DISPLAY: ':99.0'
-        TZ: 'Africa/Cairo'
-      run: |
-        Xvfb :99 -screen 0 1280x800x24 > /dev/null 2>&1 &
-        sleep 5
-        node index.js
-    
-    - name: Commit and push results
-      if: always()
-      env:
-        GH_TOKEN: ${{ secrets.GH_TOKEN }}
-      run: |
-        # إعداد git
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        git config user.name "github-actions[bot]"
-        
-        # سحب آخر التعديلات
-        git pull --rebase origin ${{ github.ref_name }} || true
-        
-        # إضافة الملفات
-        git add -A
-        
-        # Commit و push لو في تغييرات
-        if ! git diff --staged --quiet; then
-          git commit -m "🤖 Auto update - $(TZ='Africa/Cairo' date +'%Y-%m-%d %H:%M:%S')"
-          git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git
-          echo "✅ Changes pushed successfully"
-        else
-          echo "ℹ️ No changes to commit"
-        fi
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Chrome Browser
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+        id: chrome
+
+      - name: Install Xvfb and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb fonts-liberation fonts-noto-color-emoji libgbm1
+
+      - name: Install npm dependencies
+        run: |
+          npm init -y 2>/dev/null || true
+          npm install puppeteer-real-browser
+
+      - name: Create base.m3u if not exists
+        run: |
+          if [ ! -f base.m3u ]; then
+            echo "#EXTM3U" > base.m3u
+            echo "#EXTINF:-1,IPTV Channel" >> base.m3u
+            echo "http://example.com/get.php?username={USERNAME}&password={PASSWORD}&type=m3u_plus" >> base.m3u
+          fi
+
+      - name: Run IPTV script
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
+          PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
+          PUPPETEER_EXECUTABLE_PATH: ${{ steps.chrome.outputs.chrome-path }}
+          DISPLAY: ':99.0'
+          TZ: 'Africa/Cairo'
+        run: |
+          Xvfb :99 -screen 0 1280x800x24 > /dev/null 2>&1 &
+          sleep 5
+          node index.js
+
+      - name: Commit and push results
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+          git pull --rebase origin ${{ github.ref_name }} || true
+
+          git add -A
+
+          if ! git diff --staged --quiet; then
+            git commit -m "🤖 Auto update - $(TZ='Africa/Cairo' date +'%Y-%m-%d %H:%M:%S')"
+            git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }}
+            echo "✅ Changes pushed successfully"
+          else
+            echo "ℹ️ No changes to commit"
+          fi
